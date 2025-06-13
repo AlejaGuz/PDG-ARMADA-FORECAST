@@ -75,7 +75,7 @@ def retrieve_era5(product: str, params: dict, target: str):
         print(f"date_ok: {date_ok}")
         print(f"date_ok_str: {date_ok_str}")
 
-        n_days_prev = 2  # retroceder 2 días atrás
+        n_days_prev = 3  # retroceder 2 días atrás
         fb_dates = [date_ok - timedelta(days=i) for i in range(1,n_days_prev + 1)]
         print(f"fb_dates: {fb_dates}")
         
@@ -214,7 +214,7 @@ def load_era5_once(region: str = 'pacifico'):
         AREA = ATLANTICO
     
     today = date.today() #.strftime('%Y-%m-%d')
-    dates = [today - timedelta(days=i) for i in range(3)]
+    dates = [today - timedelta(days=i) for i in range(4)]
     year = [dates[0].strftime("%Y")]
     month = [dates[0].strftime("%m")]
     days   = [d.strftime('%d') for d in dates]

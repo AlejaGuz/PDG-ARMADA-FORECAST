@@ -6,7 +6,7 @@ def preprocess(df, scaler_dict=None, fit_scaler=False):
     X_vars = [col for col in df.columns if col not in ["valid_time", "latitude", "longitude", "weather_event"]]
     y_vars = [col for col in df.columns if col not in ["valid_time", "latitude", "longitude", "weather_event","lsm"]]
     
-    print(f"Preprocessing scaler_dict: {scaler_dict}")
+    # print(f"Preprocessing scaler_dict: {scaler_dict}")
     if scaler_dict is None:
         x_scaler = StandardScaler()
         y_scaler = StandardScaler()
@@ -25,7 +25,7 @@ def preprocess(df, scaler_dict=None, fit_scaler=False):
         # scaled_values = scaler.transform(df[X_vars])
 
     df[X_vars] = X_scaled
-    print(f"X_scaled: {X_scaled}")
+    # print(f"X_scaled: {X_scaled}")
     return df, X_scaled, y_scaled, {"x": x_scaler, "y": y_scaler}
     # return df, scaler
 
