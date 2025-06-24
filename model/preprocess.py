@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 from collections import defaultdict
 
@@ -25,6 +26,8 @@ def preprocess(df, scaler_dict=None, fit_scaler=False):
         # scaled_values = scaler.transform(df[X_vars])
 
     df[X_vars] = X_scaled
+    weather = df[["weather_event"]].values
+    X_scaled = np.hstack([X_scaled, weather])
     # print(f"X_scaled: {X_scaled}")
     return df, X_scaled, y_scaled, {"x": x_scaler, "y": y_scaler}
     # return df, scaler

@@ -153,7 +153,7 @@ import pandas as pd
 from urllib.request import Request, urlopen
 from io import StringIO
 
-def descargar_oni_psl_urllib():
+def descargar_oni_psl_urllib(dia):
     url = 'https://psl.noaa.gov/data/correlation/oni.data'
 
     headers = {

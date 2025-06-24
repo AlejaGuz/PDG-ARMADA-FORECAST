@@ -12,6 +12,7 @@ import os
 import logging
 import time
 from sklearn.preprocessing import StandardScaler
+import pickle
 
 
 df_oni = pd.read_csv(r'datasets\oni.csv')
@@ -47,7 +48,33 @@ def get_train_data(path_dataset,region):
     df.drop(columns=['fecha_mes', 'Fase_ENSO'], inplace=True)
     
     return df
-    
+  
+
+def acc_score(y_true, y_pred):
+    """
+    Calcula ACC (Anomaly Correlation Coefficient) por variable.
+    Entrada:
+        y_true: (n_samples, n_timesteps, n_features)
+        y_pred: (n_samples, n_timesteps, n_features)
+    Retorna:
+        accs: lista con el ACC por variable (entre -1 y 1)
+    """
+    accs = []
+    for var in range(y_true.shape[2]):
+        acc_var = []
+        for i in range(y_true.shape[0]):
+            obs = y_true[i, :, var]
+            pred = y_pred[i, :, var]
+            obs_mean = obs - np.mean(obs)
+            pred_mean = pred - np.mean(pred)
+            numerator = np.sum(pred_mean * obs_mean)
+            denominator = np.sqrt(np.sum(pred_mean**2) * np.sum(obs_mean**2))
+            if denominator != 0:
+                acc = numerator / denominator
+                acc_var.append(acc)
+        accs.append(np.mean(acc_var))
+    return accs
+  
 def entrenamiento_inicial(path_dataset, region):
     print(f"📂 Cargando dataset histórico de {region} desde {path_dataset}")
     
@@ -57,7 +84,6 @@ def entrenamiento_inicial(path_dataset, region):
     
     t0 = time.time()
     logger.info("🔄 Inicio preprocess")
-    # df_scaled, scalers = preprocess(df, fit_scaler=True)
     _, X_scaled, y_scaled, scalers = preprocess(df, fit_scaler=True)
     
     t1 = time.time()
@@ -71,43 +97,80 @@ def entrenamiento_inicial(path_dataset, region):
         "v_100", "v_250", "v_500", "v_850",
         "z_100", "z_250", "z_500", "z_850"
     ]
-
-    # X, y = [], []
-    # for i in range(len(df_scaled) - 24):
-    #     input_seq = df_scaled.iloc[i:i+12].drop(columns=["valid_time", "latitude", "longitude"]).values
-    #     output_seq = df_scaled.iloc[i+12:i+24][variables_objetivo].values
-    #     X.append(input_seq)
-    #     y.append(output_seq)
     
     X, y = [], []
     unique_coords = df[["latitude", "longitude"]].drop_duplicates()
 
+    # for _, row in unique_coords.iterrows():
+    #     lat, lon = row["latitude"], row["longitude"]
+
+    #     # Filtrar por ubicación
+    #     df_coord = df[(df["latitude"] == lat) & (df["longitude"] == lon)].sort_values("valid_time")
+    #     idxs = df_coord.index.tolist()
+
+    #     # Seleccionar secuencias usando los índices
+    #     x_seq = X_scaled[idxs]
+    #     y_seq = y_scaled[idxs]
+
+    #     # Crear ventanas deslizantes
+    #     if len(x_seq) >= 24:
+    #         for i in range(len(x_seq) - 24):
+    #             X.append(x_seq[i:i+12])
+    #             y.append(y_seq[i+12:i+24])
+
+
+    # X = np.array(X)
+    # y = np.array(y)
+
+    # print(f"📐 Dimensiones - X: {X.shape}, y: {y.shape}")
+    
+    X_train, y_train, X_val, y_val = [], [], [], []
+    n_val_steps = 10
+    
     for _, row in unique_coords.iterrows():
         lat, lon = row["latitude"], row["longitude"]
 
-        # Filtrar por ubicación
+        # Filtrar por ubicación y ordenar
         df_coord = df[(df["latitude"] == lat) & (df["longitude"] == lon)].sort_values("valid_time")
         idxs = df_coord.index.tolist()
 
-        # Seleccionar secuencias usando los índices
         x_seq = X_scaled[idxs]
         y_seq = y_scaled[idxs]
 
-        # Crear ventanas deslizantes
         if len(x_seq) >= 24:
             for i in range(len(x_seq) - 24):
-                X.append(x_seq[i:i+12])
-                y.append(y_seq[i+12:i+24])
+                x_window = x_seq[i:i+12]
+                y_window = y_seq[i+12:i+24]
 
+                if i < len(x_seq) - 24 - n_val_steps:
+                    X_train.append(x_window)
+                    y_train.append(y_window)
+                else:
+                    X_val.append(x_window)
+                    y_val.append(y_window)
+                    
+    X_train, y_train = np.array(X_train), np.array(y_train)
+    X_val, y_val = np.array(X_val), np.array(y_val)
 
-    X = np.array(X)
-    y = np.array(y)
-
-    print(f"📐 Dimensiones - X: {X.shape}, y: {y.shape}")
+    print(f"📊 Train shape: X={X_train.shape}, y={y_train.shape}")
+    print(f"📊  Val shape: X={X_val.shape}, y={y_val.shape}")
     
+    # model = build_lstm_model(input_shape=X.shape[1:], output_dim=y.shape[2])
+    model = build_lstm_model(input_shape=X_train.shape[1:], output_dim=y_train.shape[2])
+
+    # history = model.fit(X, y, epochs=50, batch_size=64, verbose=1, callbacks=get_callbacks())
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=50,
+        batch_size=32,
+        callbacks=get_callbacks(),
+        verbose=1
+    )
     
-    model = build_lstm_model(input_shape=X.shape[1:], output_dim=y.shape[2])
-    model.fit(X, y, epochs=50, batch_size=64, verbose=1, callbacks=get_callbacks())
+    with open(f"models_{region}/history.pkl", "wb") as f:
+        pickle.dump(history.history, f)
+
 
     save_model_and_scalers(model, scalers, f"models_{region}")
     print(f"✅ Modelo para {region} guardado en models_{region}")
